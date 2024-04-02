@@ -343,7 +343,7 @@ int process_command_list(struct whisper_context * ctx, audio_async &audio, const
         audio.get(2000, pcmf32_cur);
 
         if (::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, 1000, params.vad_thold, params.freq_thold, params.print_energy)) {
-            fprintf(stdout, "%s: Speech detected! Processing ...\n", __func__);
+            fprintf(stderr, "%s: Speech detected! Processing ...\n", __func__);
 
             const auto t_start = std::chrono::high_resolution_clock::now();
 
@@ -424,13 +424,13 @@ int process_command_list(struct whisper_context * ctx, audio_async &audio, const
 
                 // print the commands and the respective probabilities
                 {
-                    fprintf(stdout, "\n");
+                    fprintf(stderr, "\n");
                     for (const auto & cmd : probs_id) {
-                        fprintf(stdout, "%s: %s%-*s%s = %f | ", __func__, "\033[1m", max_len, allowed_commands[cmd.second].c_str(), "\033[0m", cmd.first);
+                        fprintf(stderr, "%s: %s%-*s%s = %f | ", __func__, "\033[1m", max_len, allowed_commands[cmd.second].c_str(), "\033[0m", cmd.first);
                         for (int token : allowed_tokens[cmd.second]) {
-                            fprintf(stdout, "'%4s' %f ", whisper_token_to_str(ctx, token), probs[token]);
+                            fprintf(stderr, "'%4s' %f ", whisper_token_to_str(ctx, token), probs[token]);
                         }
-                        fprintf(stdout, "\n");
+                        fprintf(stderr, "\n");
                     }
                 }
 
@@ -441,11 +441,11 @@ int process_command_list(struct whisper_context * ctx, audio_async &audio, const
                     const float prob = probs_id[0].first;
                     const int index = probs_id[0].second;
 
-                    fprintf(stdout, "\n");
-                    fprintf(stdout, "%s: detected command: %s%s%s | p = %f | t = %d ms\n", __func__,
+                    fprintf(stderr, "\n");
+                    fprintf(stderr, "%s: detected command: %s%s%s | p = %f | t = %d ms\n", __func__,
                             "\033[1m", allowed_commands[index].c_str(), "\033[0m", prob,
                             (int) std::chrono::duration_cast<std::chrono::milliseconds>(t_end - t_start).count());
-                    fprintf(stdout, "\n");
+                    fprintf(stderr, "\n");
                 }
             }
 
@@ -484,9 +484,9 @@ int always_prompt_transcription(struct whisper_context * ctx, audio_async & audi
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         if (ask_prompt) {
-            fprintf(stdout, "\n");
-            fprintf(stdout, "%s: The prompt is: '%s%s%s'\n", __func__, "\033[1m", k_prompt.c_str(), "\033[0m");
-            fprintf(stdout, "\n");
+            fprintf(stderr, "\n");
+            fprintf(stderr, "%s: The prompt is: '%s%s%s'\n", __func__, "\033[1m", k_prompt.c_str(), "\033[0m");
+            fprintf(stderr, "\n");
 
             ask_prompt = false;
         }
@@ -495,7 +495,7 @@ int always_prompt_transcription(struct whisper_context * ctx, audio_async & audi
             audio.get(2000, pcmf32_cur);
 
             if (::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, 1000, params.vad_thold, params.freq_thold, params.print_energy)) {
-                fprintf(stdout, "%s: Speech detected! Processing ...\n", __func__);
+                fprintf(stderr, "%s: Speech detected! Processing ...\n", __func__);
 
                 int64_t t_ms = 0;
 
@@ -520,13 +520,13 @@ int always_prompt_transcription(struct whisper_context * ctx, audio_async & audi
                 const float sim = similarity(prompt, k_prompt);
 
                 //debug
-                //fprintf(stdout, "command size: %i\n", command_length);
+                //fprintf(stderr, "command size: %i\n", command_length);
 
                 if ((sim > 0.7f) && (command.size() > 0)) {
-                    fprintf(stdout, "%s: Command '%s%s%s', (t = %d ms)\n", __func__, "\033[1m", command.c_str(), "\033[0m", (int) t_ms);
+                    fprintf(stderr, "%s: Command '%s%s%s', (t = %d ms)\n", __func__, "\033[1m", command.c_str(), "\033[0m", (int) t_ms);
                 }
 
-                fprintf(stdout, "\n");
+                fprintf(stderr, "\n");
 
                 audio.clear();
             }
@@ -555,7 +555,7 @@ int process_general_transcription(struct whisper_context * ctx, audio_async & au
     std::vector<float> pcmf32_cur;
     std::vector<float> pcmf32_prompt;
 
-    std::string k_prompt = "Ok Whisper, start listening for commands.";
+    std::string k_prompt = "Okay Whisper";
     if (!params.prompt.empty()) {
         k_prompt = params.prompt;
     }
@@ -563,6 +563,7 @@ int process_general_transcription(struct whisper_context * ctx, audio_async & au
     fprintf(stderr, "\n");
     fprintf(stderr, "%s: general-purpose mode\n", __func__);
 
+    auto last_speech_time = std::chrono::steady_clock::now();
     // main loop
     while (is_running) {
         // handle Ctrl + C
@@ -572,9 +573,9 @@ int process_general_transcription(struct whisper_context * ctx, audio_async & au
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         if (ask_prompt) {
-            fprintf(stdout, "\n");
-            fprintf(stdout, "%s: Say the following phrase: '%s%s%s'\n", __func__, "\033[1m", k_prompt.c_str(), "\033[0m");
-            fprintf(stdout, "\n");
+            fprintf(stderr, "\n");
+            fprintf(stderr, "%s: Say the following phrase: '%s%s%s'\n", __func__, "\033[1m", k_prompt.c_str(), "\033[0m");
+            fprintf(stderr, "\n");
 
             ask_prompt = false;
         }
@@ -583,7 +584,8 @@ int process_general_transcription(struct whisper_context * ctx, audio_async & au
             audio.get(2000, pcmf32_cur);
 
             if (::vad_simple(pcmf32_cur, WHISPER_SAMPLE_RATE, 1000, params.vad_thold, params.freq_thold, params.print_energy)) {
-                fprintf(stdout, "%s: Speech detected! Processing ...\n", __func__);
+                last_speech_time = std::chrono::steady_clock::now();
+                fprintf(stderr, "%s: Speech detected! Processing ...\n", __func__);
 
                 int64_t t_ms = 0;
 
@@ -594,25 +596,28 @@ int process_general_transcription(struct whisper_context * ctx, audio_async & au
                     const auto txt = ::trim(::transcribe(ctx, params, pcmf32_cur, "prompt", logprob_min0, logprob_sum0, n_tokens0, t_ms));
 
                     const float p = 100.0f * std::exp(logprob_min0);
+                    std::string modifiedTxt = txt; // Copy txt to a new variable
+                    modifiedTxt.erase(std::remove_if(modifiedTxt.begin(), modifiedTxt.end(), [](unsigned char x){return x == ',' || x == '.' || x == '!';}), modifiedTxt.end());
 
-                    fprintf(stdout, "%s: Heard '%s%s%s', (t = %d ms, p = %.2f%%)\n", __func__, "\033[1m", txt.c_str(), "\033[0m", (int) t_ms, p);
+                    fprintf(stderr, "%s: Heard '%s%s%s', (t = %d ms, p = %.2f%%)\n", __func__, "\033[1m", modifiedTxt.c_str(), "\033[0m", (int) t_ms, p);
 
-                    const float sim = similarity(txt, k_prompt);
+                    const float sim = similarity(modifiedTxt, k_prompt);
 
-                    if (txt.length() < 0.8*k_prompt.length() || txt.length() > 1.2*k_prompt.length() || sim < 0.8f) {
-                        fprintf(stdout, "%s: WARNING: prompt not recognized, try again\n", __func__);
+                    if (txt.length() < 0.8*k_prompt.length() || txt.length() > 1.2*k_prompt.length() || sim < 0.6f) {
+                        fprintf(stderr, "%s: WARNING: prompt not recognized, try again\n", __func__);
                         ask_prompt = true;
                     } else {
-                        fprintf(stdout, "\n");
-                        fprintf(stdout, "%s: The prompt has been recognized!\n", __func__);
-                        fprintf(stdout, "%s: Waiting for voice commands ...\n", __func__);
-                        fprintf(stdout, "\n");
+                        fprintf(stderr, "\n");
+                        fprintf(stderr, "%s: The prompt has been recognized!\n", __func__);
+                        fprintf(stderr, "%s: Waiting for voice commands ...\n", __func__);
+                        fprintf(stderr, "\n");
 
                         // save the audio for the prompt
                         pcmf32_prompt = pcmf32_cur;
                         have_prompt = true;
                     }
                 } else {
+                    fprintf(stderr, "Entered the command detection loop");
                     // we have heard the activation phrase, now detect the commands
                     audio.get(params.command_ms, pcmf32_cur);
 
@@ -630,7 +635,7 @@ int process_general_transcription(struct whisper_context * ctx, audio_async & au
                     //const float p = 100.0f * std::exp((logprob - logprob0) / (n_tokens - n_tokens0));
                     const float p = 100.0f * std::exp(logprob_min);
 
-                    //fprintf(stdout, "%s: heard '%s'\n", __func__, txt.c_str());
+                    //fprintf(stderr, "%s: heard '%s'\n", __func__, txt.c_str());
 
                     // find the prompt in the text
                     float best_sim = 0.0f;
@@ -652,20 +657,24 @@ int process_general_transcription(struct whisper_context * ctx, audio_async & au
                         }
                     }
 
-                    fprintf(stdout, "%s:   DEBUG: txt = '%s', prob = %.2f%%\n", __func__, txt.c_str(), p);
+                    fprintf(stderr, "%s:   DEBUG: txt = '%s', prob = %.2f%%\n", __func__, txt.c_str(), p);
                     if (best_len == 0) {
-                        fprintf(stdout, "%s: WARNING: command not recognized, try again\n", __func__);
+                        fprintf(stderr, "%s: WARNING: command not recognized, try again\n", __func__);
                     } else {
                         // cut the prompt from the decoded text
                         const std::string command = ::trim(txt.substr(best_len));
 
-                        fprintf(stdout, "%s: Command '%s%s%s', (t = %d ms)\n", __func__, "\033[1m", command.c_str(), "\033[0m", (int) t_ms);
+                        fprintf(stderr, "%s: Command '%s%s%s', (t = %d ms)\n", __func__, "\033[1m", command.c_str(), "\033[0m", (int) t_ms);
                     }
 
-                    fprintf(stdout, "\n");
+                    fprintf(stderr, "\n");
                 }
 
                 audio.clear();
+            }
+            if (have_prompt && std::chrono::steady_clock::now() - last_speech_time > std::chrono::seconds(15)) {
+                have_prompt = false;
+                fprintf(stderr, "%s: Exit listening ...\n", __func__);
             }
         }
     }
